@@ -1,0 +1,25 @@
+model{
+
+  # Priors
+  for(a in 1:nage){
+    S[a] ~ dbeta(1, 1) # uniform
+  }
+  
+  # Survival 
+#  for(i in 1:nS){
+#    Shat[i] ~ dnorm(S[age[i]], Stau[i]) # beta or on logit scale 
+#  }
+  for(i in 1:nS){
+    sdat[i, 1] ~ dnorm(S[sdat[i, 3]], sdat[i, 2]) # beta or on logit scale 
+  }
+  
+  # Nest initiation rate 
+  # Clutch size 
+  # Nest success 
+  # Hatching rate 
+  
+  # Derived parameters 
+  # Reproduction 
+  #nest * clutch * success * hatching rate * 0.5
+
+}
