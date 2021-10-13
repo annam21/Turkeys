@@ -5,15 +5,20 @@
 library(R2jags)
 
 # Survival 
-sdat <- tier1 %>% 
+sdat <- goodstuff %>% 
   filter(vitalrate == "survival", 
-         period == "annual",
-         # lifestage == "adult"
+         period == "annual"
          ) %>% 
-  mutate(tau = 1/SE,
-         age = case_when(lifestage == "subadult" ~ 1,
-                         lifestage == "adult" ~ 2)) %>% 
   select(Parameter, tau, age)
+
+# Nest initiation ("nesting rate", "renesting rate")
+# "third nest rate" doesn't have any uncertainty 
+nestdat <- goodstuff %>% 
+  filter(vitalrate == "nesting rate") %>% 
+  select(Parameter, tau, age)
+  
+renestdat <- goodstuff %>% 
+  filter(vitalrate == "renesting rate")
 
 # JAGS data
 jdata <- list(
@@ -25,6 +30,8 @@ jdata <- list(
   # Shat = Shat$Parameter,
   # Stau = Shat$tau,
   # nS = length(Shat$Parameter)
+  
+  # Nest initiation
 )
 
 jinits <- function(){
