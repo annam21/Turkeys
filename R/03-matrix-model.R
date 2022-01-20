@@ -21,6 +21,7 @@ nrep <- 1000
 lambda <- rep(NA, nrep)
 S <- matrix(NA, nrow = nrep, ncol = 2)
 R <- matrix(NA, nrow = nrep, ncol = 2)
+elast <- array(NA, c(2,2,nrep))
 for(i in 1:nrep){
   # S[i,] <- rnorm(2, Smu, Ssd) # fine but I only use adult survival
   S[i,] <- rtnorm(2, Smu, Ssd, lower = 0, upper = 1)
@@ -35,6 +36,7 @@ for(i in 1:nrep){
     byrow = TRUE
   )
   lambda[i] <- eigen(mat)$values[1]
+  elast[,,i] <- popbio::elasticity(mat)
 }
 
 # Visualize 
@@ -70,10 +72,11 @@ summary(r2)$r.squared
 # hist(rnorm(1000, res$BUGSoutput$median$NI[2,1], res$BUGSoutput$sd$NI[2,1]))
 # All have 2 columns - age 1 and age 2
 
-# truncate normal (doesn't change much but ok)
+# truncated normal (doesn't change much but ok)
 nrep <- 1000
 lambda <- rep(NA, nrep)
 NI1 <- NI2 <- NS1 <- NS2 <- C1 <- C2 <- H <- PS <- S <- R<- matrix(NA, nrow = nrep, ncol = 2)
+elast <- array(NA, c(2, 2, nrep))
 for(i in 1:nrep){
   # NI1[i,] <- rnorm(2, res$BUGSoutput$median$NI[,1], res$BUGSoutput$sd$NI[,1])
   # NI2[i,] <- rnorm(2, res$BUGSoutput$median$NI[,2], res$BUGSoutput$sd$NI[,2])
@@ -115,6 +118,9 @@ for(i in 1:nrep){
     byrow = TRUE
   )
   lambda[i] <- eigen(mat)$values[1]
+  
+  # Elasticity 
+  elast[, , i] <- popbio::elasticity(mat)
 }
 
 # Visualize 
@@ -122,6 +128,9 @@ mnl <- mean(lambda)
 hist(lambda)
 abline(v = mnl, col = "red", lty = "dashed", lwd = 2)
 text(x = mnl+0.2, y = 150, labels = paste0("lambda ", round(mnl, 2)), col = "red")
+
+# Elasticity 
+apply(elast, c(1,2), mean)
 
 # Regression by age
 ni1 <- apply(NI1, 2, function(x) lm(lambda~x))
@@ -151,6 +160,9 @@ lapply(ns2, function(x) summary(x)$r.squared)
 c2 <- apply(C2, 2, function(x) lm(lambda~x))
 lapply(c2, function(x) summary(x)$r.squared)
 
+rr <- apply(R, 2, function(x) lm(lambda~x))
+lapply(rr, function(x) summary(x)$r.squared)
+
 # Stack these
 library(dplyr)
 getr2 <- function(mod){
@@ -160,14 +172,32 @@ getr2 <- function(mod){
   dat2 <- data.frame(vr = deparse(substitute(mod)) ) # name of vital rate
   cbind(tmp2, dat2)
 }
-# getr2(ni1)
 repro <- bind_rows(getr2(ni1), getr2(ns1), getr2(c1), getr2(h), getr2(ps), 
-          getr2(ni2), getr2(ns2), getr2(c2)) 
-# survival is sort of its own thing
-getr2(s1)
+          getr2(ni2), getr2(ns2), getr2(c2), getr2(rr), getr2(s1)) 
 
-apply(repro[,1:2], 2, sum) # total variation explained by these pieces 
-
+# Make a table for MS
+repro %>% 
+  mutate(
+    age1 = round(age1, 2),
+    age2 = round(age2, 2),
+    vr = case_when(
+      vr == "ni1" ~ "NI1",
+      vr == "ns1" ~ "NS1",
+      vr == "c1" ~ "C1",
+      vr == "h" ~ "H",
+      vr == "ps" ~ "PS",
+      vr == "ni2" ~ "NI2",
+      vr == "ns2" ~ "NS2",
+      vr == "c2" ~ "C2",
+      vr == "rr" ~ "Reproduction",
+      vr == "s1" ~ "Annual Survival"
+    )
+  ) %>% 
+  select(vr, age1, age2) %>% 
+  rename(Subadult = age1, 
+         Adult = age2, 
+         `Vital Rate` = vr) #%>% 
+  # readr::write_csv("results/rsquared.csv")
 
 
 # Plot a few of them

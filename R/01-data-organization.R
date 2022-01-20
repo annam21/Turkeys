@@ -139,8 +139,8 @@ tur <- tur_yrs %>%
     )
   ) %>% 
   # Remove any missing Parameter values and n = 0
-  filter(!is.na(Parameter),
-         is.na(n) | n > 0) %>%
+  filter(!is.na(Parameter)) %>% 
+         # is.na(n) | n > 0) %>%
   # Only Easterns
   filter(Subspecies == "Eastern")
 
@@ -154,7 +154,7 @@ p1 <- tur %>%
   filter(vitalrate %in% rateparams & 
          (Parameter > 1)) %>% 
   mutate(Parameter = Parameter/100,
-         SE = SE/100) # And CIs but there aren't any...
+         SE = SE/100) # And CIs but there aren't any so that's nice
  
 tur <- tur %>% 
   filter(!(vitalrate %in% rateparams & 
@@ -217,7 +217,18 @@ tur <- tur %>%
   ) %>% 
   bind_rows(., seforrate)
 
+# Select only the vital rates I'll use 
+# Get down to the estimates I used only 
+# tur <- tur %>%
+#   filter((vitalrate == "survival" & period == "annual")|
+#            vitalrate == "nesting rate" |
+#            vitalrate == "hatching rate"|
+#            vitalrate == "nest success"|
+#            vitalrate == "clutch size"|
+#            (vitalrate == "poult survival" &  periodinfo %in% c("0-28 days post hatch"))
+#   )
 
+###############
   
 # After all that, remove if no SE
 tur <- tur %>%
