@@ -3,6 +3,7 @@
 # 8/27/2021
 
 # To do list 
+# Bring in symposium data, put through all the same checks/mutations, add to old data
 # X Turn mortality rates into survival 
 # X Turn mortality error into survival error 
 # X Make sure all age classes are correct 

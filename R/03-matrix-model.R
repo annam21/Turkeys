@@ -15,7 +15,7 @@ Smu <- res$BUGSoutput$median$S
 Ssd <- res$BUGSoutput$sd$S
 
 # Regression and lambda
-nrep <- 1000
+nrep <- 1
 
 # pre-birth matrix (only 1yo and 2yo exist. Initiate,succeed,etc the next day)
 lambda <- rep(NA, nrep)
@@ -30,7 +30,7 @@ for(i in 1:nrep){
   mat <- matrix(
     c(
       R[i,1], R[i,2],
-      S[i,2], S[i,2] # 1yo and 2yo live at adult survival 
+      S[i,1], S[i,2] # 1yo and 2yo live at adult survival 
     ),
     nrow = 2,
     byrow = TRUE
@@ -38,6 +38,10 @@ for(i in 1:nrep){
   lambda[i] <- eigen(mat)$values[1]
   elast[,,i] <- popbio::elasticity(mat)
 }
+
+# Quick results
+mean(lambda)
+apply(elast, c(1,2), mean)
 
 # Visualize 
 mnl <- mean(lambda)
@@ -134,34 +138,34 @@ apply(elast, c(1,2), mean)
 
 # Regression by age
 ni1 <- apply(NI1, 2, function(x) lm(lambda~x))
-lapply(ni1, function(x) summary(x)$r.squared)
+# lapply(ni1, function(x) summary(x)$r.squared)
 
 ns1 <- apply(NS1, 2, function(x) lm(lambda~x))
-lapply(ns1, function(x) summary(x)$r.squared)
+# lapply(ns1, function(x) summary(x)$r.squared)
 
 c1 <- apply(C1, 2, function(x) lm(lambda~x))
-lapply(c1, function(x) summary(x)$r.squared)
+# lapply(c1, function(x) summary(x)$r.squared)
 
 h <- apply(H, 2, function(x) lm(lambda~x))
-lapply(h, function(x) summary(x)$r.squared)
+# lapply(h, function(x) summary(x)$r.squared)
 
 ps <- apply(PS, 2, function(x) lm(lambda~x))# Not sure this will work 
-lapply(ps, function(x) summary(x)$r.squared)
+# lapply(ps, function(x) summary(x)$r.squared)
 
 s1 <- apply(S, 2, function(x) lm(lambda~x)) # actually just s
-lapply(s1, function(x) summary(x)$r.squared)
+# lapply(s1, function(x) summary(x)$r.squared)
 
 ni2 <- apply(NI2, 2, function(x) lm(lambda~x))
-lapply(ni2, function(x) summary(x)$r.squared)
+# lapply(ni2, function(x) summary(x)$r.squared)
 
 ns2 <- apply(NS2, 2, function(x) lm(lambda~x))
-lapply(ns2, function(x) summary(x)$r.squared)
+# lapply(ns2, function(x) summary(x)$r.squared)
 
 c2 <- apply(C2, 2, function(x) lm(lambda~x))
-lapply(c2, function(x) summary(x)$r.squared)
+# lapply(c2, function(x) summary(x)$r.squared)
 
 rr <- apply(R, 2, function(x) lm(lambda~x))
-lapply(rr, function(x) summary(x)$r.squared)
+# lapply(rr, function(x) summary(x)$r.squared)
 
 # Stack these
 library(dplyr)
@@ -175,7 +179,7 @@ getr2 <- function(mod){
 repro <- bind_rows(getr2(ni1), getr2(ns1), getr2(c1), getr2(h), getr2(ps), 
           getr2(ni2), getr2(ns2), getr2(c2), getr2(rr), getr2(s1)) 
 
-# Make a table for MS
+# Make pretty table for MS
 repro %>% 
   mutate(
     age1 = round(age1, 2),
