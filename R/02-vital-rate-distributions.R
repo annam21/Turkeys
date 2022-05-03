@@ -6,7 +6,8 @@
 library(tidyverse)
 library(R2jags)
 # turdat <- readRDS("data/tier1.rds") 
-turdat <- readRDS("data/Eastern_tier1.rds") 
+# turdat <- readRDS("data/Eastern_tier1.rds") 
+turdat <- readRDS("data/Eastern_tier1_withsymposium.rds") 
 # turdat <- tier1 %>% # From other script
 #   filter(`Publication Year` > 2007)
 
@@ -64,7 +65,8 @@ cdat <- turdat %>%
 #   select(Parameter, tau, age)
 
 # assuming each day has equal survival
-# Make sure to only use "0-28 days post hatch" from Strata 19 !!!!!!!!!!!!!!!!!!!
+# Make sure to only use "0-28 days post hatch" from Strata 19 !
+# Check other periodinfo -- "summer" not useful for our purposes 
 psdat <- turdat %>% 
   filter(vitalrate == "poult survival",
          # periodinfo %in% c("0-14 days post hatch", "0-28 days post hatch",
@@ -132,7 +134,7 @@ jinits <- function(){
   )
 }
 
-jparams = c("S", "NI", "H", "NS", "C", "PSD", "PS", "R")
+jparams = c("S", "NI", "H", "NS", "C", "PSD", "PS", "YS", "R")
 
 ni <- 30000
 nt <- 1
@@ -153,11 +155,9 @@ res
 mcmcplots::mcmcplot(res)
 
 # saveRDS(res, "results/Eastern_parameterestimates11122021.rds")
-# saveRDS(res, "results/Eastern_parameterestimates01142022.rds")
+# saveRDS(res, "results/Eastern_parameterestimates05032022.rds")
 
-
-
-# Create a table with sample sizes of estimates actually used 
+# Create a table with sample sizes of estimates actually used
 sampsz <- sdat %>%
   mutate(vitalrate = "annual survival") %>%
   bind_rows(nidat %>% mutate(vitalrate = "nest initiation")) %>%
@@ -166,28 +166,48 @@ sampsz <- sdat %>%
   bind_rows(cdat %>%  mutate(vitalrate = "clutch size")) %>%
   bind_rows(psdat %>% mutate(vitalrate = "poult survival to 28 days")) %>%
   rename(nestattempt = period) %>%
-  count(vitalrate, age, nestattempt) 
-# write_csv(sampsz, "results/samplesizefordistributions.csv")
-
+  count(vitalrate, age, nestattempt) %>% 
+  mutate(vitalrate = case_when(
+    vitalrate == "clutch size" ~ "Clutch Size",
+    vitalrate == "hatching rate" ~ "Hatching Rate",
+    vitalrate == "nest initiation"~ "Nest Initiation",
+    vitalrate == "nest success" ~ "Nest Success",
+    vitalrate == "poult survival to 28 days" ~ "Poult Survival to 28 days",
+    vitalrate == "annual survival" ~ "Annual Survival"
+  )) 
+# write_csv(sampsz, "results/samplesizefordistributions_withsymposium.csv")
 
 # Taylor table 1
 tab1 <- res$BUGSoutput$summary %>% 
   as.data.frame() %>%
   select(mean, sd, "2.5%", "97.5%") %>% 
   mutate(param = rownames(.)) %>% 
+  mutate_at(vars(mean:"97.5%"), ~round(.x, 2)) %>% 
   filter(param != "deviance") %>% 
   separate(param, c("vitalrate", "Age", "Nest Attempt")) %>% 
   mutate("Vital Rate" = case_when(
     vitalrate == "C" ~ "Clutch Size",
     vitalrate == "H" ~ "Hatching Rate",
     vitalrate == "NI"~ "Nest Initiation",
-    vitalrate == "NS" ~ "Nest Survival",
+    vitalrate == "NS" ~ "Nest Success",
     vitalrate == "PS" ~ "Poult Survival to 28 days",
     vitalrate == "S" ~ "Annual Survival",
-    vitalrate == "R" ~ "Recruitment"
+    vitalrate == "R" ~ "Reproduction",
+    vitalrate == "YS" ~ "Youth Survival (28-365 days)"
   )) %>%
-  select("Vital Rate", "Age", "Nest Attempt", "mean", "sd", "2.5%", "97.5%")
-# write_csv(tab1, "results/Table 1.csv")
+  select("Vital Rate", "Age", "Nest Attempt", "mean", "sd", "2.5%", "97.5%") %>% 
+  rename(Mean = mean, 
+        `Standard Deviation` = sd) %>% 
+  # Get sample size in there
+  mutate(Age = as.numeric(Age),
+         `Nest Attempt` = as.numeric(`Nest Attempt`)) %>% 
+  left_join(., sampsz, 
+            by = c("Vital Rate" = "vitalrate", "Age" = "age", "Nest Attempt" = "nestattempt")) %>% 
+  mutate(n = replace(n, `Vital Rate` == "Clutch Size" & Age == 2 & `Nest Attempt` == 2, 0)) %>% 
+  # make age prettier
+  mutate(Age = recode(Age, "1" = "Subadult", "2" = "Adult"))
+
+# write_csv(tab1, "results/Table 1_withsymposium.csv")
 
 # Another way to split out age and nest attempt 
 # mutate(age = case_when(

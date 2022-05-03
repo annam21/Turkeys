@@ -8,14 +8,14 @@ library(msm) # rtnorm
 # load data 
 # res <- readRDS("results/parameterestimates10192021.rds")
 # res <- readRDS("results/Eastern_parameterestimates11122021.rds")
-res <- readRDS("results/Eastern_parameterestimates01142022.rds")
+res <- readRDS("results/Eastern_parameterestimates05032022.rds")
 Rmu <- res$BUGSoutput$median$R
 Rsd <- res$BUGSoutput$sd$R
 Smu <- res$BUGSoutput$median$S
 Ssd <- res$BUGSoutput$sd$S
 
 # Regression and lambda
-nrep <- 1
+nrep <- 1000
 
 # pre-birth matrix (only 1yo and 2yo exist. Initiate,succeed,etc the next day)
 lambda <- rep(NA, nrep)
@@ -116,7 +116,7 @@ for(i in 1:nrep){
   mat <- matrix(
     c(
       R[i,1], R[i,2],
-      S[i,2], S[i,2]
+      S[i,1], S[i,2]
     ),
     nrow = 2,
     byrow = TRUE
@@ -200,8 +200,8 @@ repro %>%
   select(vr, age1, age2) %>% 
   rename(Subadult = age1, 
          Adult = age2, 
-         `Vital Rate` = vr) #%>% 
-  # readr::write_csv("results/rsquared.csv")
+         `Vital Rate` = vr) #%>% s
+  # readr::write_csv("results/rsquared_withsyposium.csv")
 
 
 # Plot a few of them

@@ -88,6 +88,9 @@ model{
 #    PS[a] <- (PSD[a])^28
 #  }
 
+  # Derive youth survival
+  YS <- S[1]^(48/52)
+
   # Derived parameters 
   # Reproduction 
   # note we only have data for 1st nest hatching and that's hard-coded here

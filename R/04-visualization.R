@@ -4,7 +4,8 @@
 
 library(tidyverse)
 
-turdat <- readRDS("data/Eastern_tier1.rds") 
+# turdat <- readRDS("data/Eastern_tier1.rds") 
+turdat <- readRDS("data/Eastern_tier1_withsymposium.rds") 
 
 # By publication year or study year-ish
 tst <- turdat %>% 
@@ -16,9 +17,10 @@ tst <- turdat %>%
       vitalrate == "nest success" |
       vitalrate == "clutch size" | 
       (vitalrate == "poult survival" &
-         periodinfo %in% c("0-14 days post hatch",
-                           "0-28 days post hatch",
-                           "14-28 days post hatch"))
+         periodinfo %in% c("0-28 days post hatch"
+                           # "0-14 days post hatch",
+                           # "14-28 days post hatch"
+                           ))
       # vitalrate == "poult survival" # For everything graph, instead of above lines
   ) %>% 
   mutate(vitalrate = replace(vitalrate, vitalrate == "survival", "annual survival")) %>% 
@@ -30,7 +32,7 @@ tst <- turdat %>%
   # add in publication year if there's still no year
   mutate(plotyr = replace(plotyr, is.na(plotyr) & !is.na(pubyr), pubyr))
 
-xaxis <- seq(1985, 2020, by = 10)
+xaxis <- seq(1970, 2020, by = 10)
 # ggplot(tst, aes(pubyr, n) ) + 
 ggplot(tst, aes(plotyr, n)) + 
   geom_col(aes(fill = vitalrate), position = "dodge") + 
@@ -42,7 +44,7 @@ ggplot(tst, aes(plotyr, n)) +
   # xlab("Publication year") + 
   xlab("Study year") +
   ylab("Estimates used")
-# ggsave("results/vitalrate_year.jpg")
+ggsave("results/vitalrate_year_withsymposium.jpg")
 
 ########################################
 # All vital rates from review 
@@ -54,27 +56,56 @@ tur_over <- read_csv("data/turkey demographics paper overview.csv") %>%
   select(ID, Strata, "Publication Year", Years, Subspecies, Season, State)
 
 # Combine year columns 
-tur_yrs <- left_join(tur_raw, tur_over, by = "Strata") %>% 
-  rename(studyyears = Years)
+tur_orig <- left_join(tur_raw, tur_over, by = "Strata") %>% 
+  rename(studyyears = Years) %>% 
+  rename(citation = "Strata", 
+         vitalrate = "Vital Rate",
+         lifestage = "Life Stage",
+         error = "Error Measurment", 
+         # pubyr = "Publication Year",
+         # treatment = "treatments ?",
+         # comments = "Parameter Comments",
+         ) %>% 
+  select(vitalrate, period, lifestage, Sex, Parameter, SE, SD, CIwidth, error,
+         LCL, UCL, n,  citation, 
+         # pubyr, treatment, 
+         Year, Subspecies, State, studyyears, ID) 
 
-# Clean up columns, data
-tur <- tur_yrs %>% 
+# Symposium data
+symp <- read_csv("data/symposium/symposium_vitalrates.csv") %>% 
+  select(-Authors, -`Publication title`, -Journal)
+sym_over <- read_csv("data/symposium/symposium_overview.csv") %>% 
+  # Create ID with full citation info 
+  unite(ID, Authors, `Publication Year`, `Publication title`, Journal, sep = ". ") %>% 
+  unite(ID, ID, Volume, sep = " ") %>% 
+  unite(ID, ID, `Begin Page`, sep = ": ") %>% 
+  unite(ID, ID, `End Page`, sep = "-")
+
+tur_symp <- left_join(symp, sym_over, by = c("Strata")) %>% 
   rename(citation = "Strata", 
          vitalrate = "Vital Rate",
          lifestage = "Life Stage",
          error = "Error Measurment",
-         # errortype = "Error measurment type", 
-         comments = "Parameter Comments",
-         treatment = "treatments ?",
-         # tier = "Vital Rate Tier",
-         # usefulness = "Usefulness tier",
-         pubyr = "Publication Year") %>% 
+         errortype = "Error measurment type",
+         # pubyr = "Publication Year",
+         comments = "Parameter Comments"
+         ) %>% 
   select(vitalrate, period, lifestage, Sex, Parameter, SE, SD, CIwidth, error,
-         LCL, UCL, n,  treatment, 
-         citation, pubyr, Year, Subspecies, State, studyyears, ID) %>% 
+         LCL, UCL, n, citation, 
+         # pubyr, plotyr, 
+         Year, Subspecies, State, ID) 
+
+tur_all <- bind_rows(tur_orig, tur_symp)
+
+# Clean up columns, data
+tur <- tur_all %>% 
   mutate(lifestage = replace(lifestage, 
                              lifestage == "Adult" | lifestage == "adults",
                              "adult"),
+         lifestage = replace(lifestage, 
+                             lifestage == "subadults" | lifestage == "subaudults",
+                             "subadult"),
+         vitalrate = replace(vitalrate, vitalrate == "Annual survival", "annual survival"),
          vitalrate = replace(vitalrate, vitalrate == "nest suvival", "nest survival"),
          Subspecies = replace(Subspecies, Subspecies == "Mirriam's", "Merriam's")
   ) %>%
@@ -94,7 +125,8 @@ tur <- tur_yrs %>%
           "nesting rate") ~ "first nest",
       vitalrate %in% 
         c("renest clutch size", "renest DSR", "renest hatching rate", 
-          "renest success", "renest survival", "renesting rate") ~ "second nest", 
+          "renest success", "renest survival", "renesting rate", 
+          "renest rate") ~ "second nest", 
       vitalrate %in% c("third nest rate", "third nest success")~ "third nest",
       vitalrate == "recruitment rate" ~ "annual"
     ),
@@ -110,8 +142,10 @@ tur <- tur_yrs %>%
       vitalrate == "renest success" ~ "nest success",
       vitalrate == "renest survival" ~ 'nest survival',
       vitalrate == "renesting rate" ~ "nesting rate",
+      vitalrate == "renest rate" ~ "nesting rate",
       vitalrate == "third nest rate" ~ "nesting rate",
       vitalrate == "third nest success" ~ "nest success",
+      vitalrate == "Production" ~ "poults per hen",
       # Then all the others I don't want to change 
       vitalrate == "brood success" ~ "brood success",
       vitalrate == "clutch size" ~ "clutch size",
@@ -123,10 +157,12 @@ tur <- tur_yrs %>%
       vitalrate == "nesting rate" ~ "nesting rate",
       vitalrate == "poult survival" ~ "poult survival",
       vitalrate == "recruitment rate" ~ "recruitment rate",
-      vitalrate == "annual mortality" ~ "annual mortality"
+      vitalrate == "annual mortality" ~ "annual mortality",
+      vitalrate == "female success" ~ "female success"
     ),
     State = replace(State, State == "Wisonson", "Wisconsin"),
-    State = replace(State, State == "Conneticut", "Connecticut")
+    State = replace(State, State == "Conneticut", "Connecticut"),
+    State = replace(State, State == "Minnisota", "Minnesota")
   ) %>% 
   # For display purposes, recode sex 
   mutate(Sex = case_when(
@@ -159,10 +195,10 @@ appnd <- tur %>%
   rename(citation = ID) %>% 
   arrange(citation)
 
-write_csv(appnd, "results/Appendix 1_all vital rates.csv")
+# write_csv(appnd, "results/Appendix 1_all vital rates_withsymposium.csv")
 
 # why are we missing some citation numbers? 
-# 28, 33,45, 62
+# 28, 33, 45, 62
 
 # We had originally planned on using citation number in the table and a list of citations 
 # below it 

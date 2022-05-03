@@ -72,26 +72,26 @@ tur_yrs <- left_join(tur_raw, tur_over_yrs, by = "Strata") %>%
   select(-gyvr, -gyover, -Years)
 
 # Clean up columns, data
-tur <- tur_yrs %>% 
-  rename(citation = "Strata", 
+tur <- tur_yrs %>%
+  rename(citation = "Strata",
          vitalrate = "Vital Rate",
          lifestage = "Life Stage",
          error = "Error Measurment",
-         # errortype = "Error measurment type", 
+         # errortype = "Error measurment type",
          comments = "Parameter Comments",
          treatment = "treatments ?",
          # tier = "Vital Rate Tier",
          # usefulness = "Usefulness tier",
-         pubyr = "Publication Year") %>% 
+         pubyr = "Publication Year") %>%
   select(vitalrate, period, lifestage, Sex, Parameter, SE, SD, CIwidth, error,
-         LCL, UCL, n,  treatment, #tier, usefulness, 
-         citation, pubyr, Year, plotyr, Subspecies, State) %>% 
-  mutate(lifestage = replace(lifestage, 
+         LCL, UCL, n,  treatment, #tier, usefulness,
+         citation, pubyr, Year, plotyr, Subspecies, State) %>%
+  mutate(lifestage = replace(lifestage,
                              lifestage == "Adult" | lifestage == "adults",
                              "adult"),
          vitalrate = replace(vitalrate, vitalrate == "nest suvival", "nest survival")
   ) %>%
-  # Turn mortality into survival 
+  # Turn mortality into survival
   mutate(Parameter = replace(Parameter, vitalrate == "annual mortality", 1-Parameter[vitalrate == "annual mortality"]),
          vitalrate = replace(vitalrate, vitalrate == "annual mortality", "annual survival"),
   ) %>%
@@ -105,13 +105,13 @@ tur <- tur_yrs %>%
       vitalrate == "post-nesting survival (DSR)" ~ "daily",
       vitalrate == "poult survival" ~ "seasonal",
       vitalrate == "poult survival to November (DSR)" ~ "daily",
-      vitalrate %in% 
-        c("brood success", "clutch size", "hatching rate", 
+      vitalrate %in%
+        c("brood success", "clutch size", "hatching rate",
           "natality rate", "nest DSR", "nest success", "nest survival",
           "nesting rate") ~ "first nest",
-      vitalrate %in% 
-        c("renest clutch size", "renest DSR", "renest hatching rate", 
-          "renest success", "renest survival", "renesting rate") ~ "second nest", 
+      vitalrate %in%
+        c("renest clutch size", "renest DSR", "renest hatching rate",
+          "renest success", "renest survival", "renesting rate") ~ "second nest",
       vitalrate %in% c("third nest rate", "third nest success")~ "third nest",
       vitalrate == "recruitment rate" ~ "annual"
     ),
@@ -129,7 +129,7 @@ tur <- tur_yrs %>%
       vitalrate == "renesting rate" ~ "nesting rate",
       vitalrate == "third nest rate" ~ "nesting rate",
       vitalrate == "third nest success" ~ "nest success",
-      # Then all the others I don't want to change 
+      # Then all the others I don't want to change
       vitalrate == "brood success" ~ "brood success",
       vitalrate == "clutch size" ~ "clutch size",
       vitalrate == "hatching rate" ~ "hatching rate",
@@ -141,9 +141,9 @@ tur <- tur_yrs %>%
       vitalrate == "poult survival" ~ "poult survival",
       vitalrate == "recruitment rate" ~ "recruitment rate"
     )
-  ) %>% 
+  ) %>%
   # Remove any missing Parameter values and n = 0
-  filter(!is.na(Parameter)) %>% 
+  filter(!is.na(Parameter)) %>%
          # is.na(n) | n > 0) %>%
   # Only Easterns
   filter(Subspecies == "Eastern")
@@ -161,7 +161,7 @@ sym_over <- read_csv("data/symposium/symposium_overview.csv")
 # Clean up columns, data
 tur_sym <- left_join(symp, sym_over,
                      by = c("Strata")
-) %>% 
+  ) %>% 
   rename(citation = "Strata", 
          vitalrate = "Vital Rate",
          lifestage = "Life Stage",
@@ -340,6 +340,15 @@ tier1 <- tur %>%
          age = case_when(lifestage == "subadult" ~ 1,
                          lifestage == "adult" ~ 2)) 
 
+# Look at states, remove some if out of native range 
+tier1 %>% 
+  distinct(State)
+
+tier1 <- tier1 %>% 
+  mutate(State = replace(State, State == "Minnisota", "Minnesota"),
+         State = replace(State, State == "Conneticut", "Connecticut"),
+         State = replace(State, State == "Wisconson", "Wisconsin"))
+
 # saveRDS(tier1, "data/tier1.rds")
 # saveRDS(tier1, "data/Eastern_tier1_withsymposium.rds")
 
@@ -353,4 +362,6 @@ tier1 %>%
 tur %>% 
   filter(Sex == "F") %>% 
   filter(lifestage %in% c("adult", "subadult"))
+
+
 
