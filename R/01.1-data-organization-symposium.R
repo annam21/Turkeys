@@ -4,56 +4,18 @@
 
 library(tidyverse)
 
-symp <- read_csv("data/symposium/symposium_vitalrates.csv")
+symp <- read_csv("data/symposium/symposium_vitalrates.csv") %>% 
+  select(-Authors, -`Publication title`, -Journal)
 sym_over <- read_csv("data/symposium/symposium_overview.csv")
 
-# Break up the year ranges ####
-# Single range
-oner <- sym_over %>%
-  filter(grepl("-", .$Years), !grepl(";", .$Years)) %>%
-  separate(Years, into = c("begin_yr", "end_yr"), sep = "-", remove = F) 
-# Where there's multiple ranges, pick 1st and last year
-mr <- sym_over %>%
-  filter(grepl(";", .$Years), grepl("-", .$Years)) %>%
-  separate(Years, into = c("firstint", "secint"), sep = ";", remove = F) %>% 
-  separate(firstint, into = c("begin_yr", "tmp"), sep = "-") %>% 
-  separate(secint, into = c("tmp", "end_yr"), sep = "-") %>% 
-  select(-tmp) 
-# Just years separated by ; (Just Porter)
-sr <- sym_over %>% 
-  filter(grepl(";", .$Years), !grepl("-", .$Years)) %>%
-  separate(Years, into = c("begin_yr", "trash", "end_yr"), sep = ";", remove = F) %>% 
-  select(-trash)
-# If there's only one year
-oney <- sym_over %>%
-  filter(!grepl(";", .$Years), !grepl("-", .$Years)) %>%
-  mutate(begin_yr = Years,
-         end_yr = Years)
-# Put them back together 
-sym_over_yrs <- sym_over %>% 
-  # Get rid of everything with ranges, bring them back in
-  filter(!grepl("-", .$Years), 
-         !grepl(";", .$Years),
-         is.na(Years)) %>% 
-  bind_rows(., oner, mr, sr, oney) 
-# Pick out the year I want to keep 
-tur_yrs <- left_join(symp, sym_over_yrs, by = "Strata") %>% 
-  mutate(
-    gyvr = !grepl("-", .$Year) & !is.na(Year),
-    # gyover = !is.na(begin_yr), # first or last year of range
-    gyover = !is.na(Years),
-    plotyr = case_when(
-      gyvr == T ~ Year,
-      # gyvr == F & gyover == T ~ begin_yr 
-      gyvr == F & gyover == T ~ end_yr 
-      # otherwise NA
-    )
-  ) %>%
-  mutate(plotyr = as.numeric(plotyr)) %>% 
-  select(-gyvr, -gyover, -Years)
+# I did a bunch to try to get the plot year and then ended up getting rid of it and doing 
+#   it by hand. If there was a year provided, I used that. If there was a range of years,
+#   I used the last one. If there was no year, I used the publication year
 
 # Clean up columns, data
-tur <- tur_yrs %>% 
+tur_sym <- left_join(symp, sym_over,
+                 by = c("Strata")
+                 ) %>% 
   rename(citation = "Strata", 
          vitalrate = "Vital Rate",
          lifestage = "Life Stage",
@@ -62,7 +24,7 @@ tur <- tur_yrs %>%
          comments = "Parameter Comments",
          pubyr = "Publication Year") %>% 
   select(vitalrate, period, lifestage, Sex, Parameter, SE, SD, CIwidth, error,
-         LCL, UCL, n,  treatment, 
+         LCL, UCL, n, 
          citation, pubyr, Year, plotyr, Subspecies, State) %>% 
   mutate(lifestage = replace(lifestage, 
                              lifestage == "Adult" | lifestage == "adults",
@@ -72,28 +34,24 @@ tur <- tur_yrs %>%
                              "subadult"),
          vitalrate = replace(vitalrate, vitalrate == "Annual survival", "annual survival")
   ) %>%
-  # Turn mortality into survival 
-  mutate(Parameter = replace(Parameter, vitalrate == "annual mortality", 1-Parameter[vitalrate == "annual mortality"]),
-         vitalrate = replace(vitalrate, vitalrate == "annual mortality", "annual survival"),
-  ) %>%
   # Rename my vital rates and create appropriate periods
   mutate(
     periodinfo = period,
     period = case_when(
       vitalrate == "annual survival" ~ "annual",
       vitalrate == "seasonal survival" ~ "seasonal",
-      vitalrate == "Nesting Season survival (DSR)" ~ "daily",
-      vitalrate == "post-nesting survival (DSR)" ~ "daily",
+      # vitalrate == "Nesting Season survival (DSR)" ~ "daily",
+      # vitalrate == "post-nesting survival (DSR)" ~ "daily",
       vitalrate == "poult survival" ~ "seasonal",
-      vitalrate == "poult survival to November (DSR)" ~ "daily",
+      # vitalrate == "poult survival to November (DSR)" ~ "daily",
       vitalrate %in% 
         c("brood success", "clutch size", "hatching rate", 
           "natality rate", "nest DSR", "nest success", "nest survival",
           "nesting rate") ~ "first nest",
       vitalrate %in% 
         c("renest clutch size", "renest DSR", "renest hatching rate", 
-          "renest success", "renest survival", "renesting rate") ~ "second nest", 
-      vitalrate %in% c("third nest rate", "third nest success")~ "third nest",
+          "renest success", "renest survival", "renesting rate", "renest rate") ~ "second nest", 
+      # vitalrate %in% c("third nest rate", "third nest success")~ "third nest",
       vitalrate == "recruitment rate" ~ "annual"
     ),
     vitalrate = case_when(
@@ -108,8 +66,10 @@ tur <- tur_yrs %>%
       vitalrate == "renest success" ~ "nest success",
       vitalrate == "renest survival" ~ 'nest survival',
       vitalrate == "renesting rate" ~ "nesting rate",
+      vitalrate == "renest rate" ~ "nesting rate",
       vitalrate == "third nest rate" ~ "nesting rate",
       vitalrate == "third nest success" ~ "nest success",
+      vitalrate == "Production" ~ "poults per hen",
       # Then all the others I don't want to change 
       vitalrate == "brood success" ~ "brood success",
       vitalrate == "clutch size" ~ "clutch size",
@@ -120,7 +80,8 @@ tur <- tur_yrs %>%
       vitalrate == "nest survival" ~ "nest survival",
       vitalrate == "nesting rate" ~ "nesting rate",
       vitalrate == "poult survival" ~ "poult survival",
-      vitalrate == "recruitment rate" ~ "recruitment rate"
+      vitalrate == "recruitment rate" ~ "recruitment rate",
+      vitalrate == "female success" ~ "female success"
     )
   ) %>% 
   # Remove any missing Parameter values and n = 0
@@ -128,3 +89,54 @@ tur <- tur_yrs %>%
   # is.na(n) | n > 0) %>%
   # Only Easterns
   filter(Subspecies == "Eastern")
+
+
+
+
+# Old
+# # Break up the year ranges ####
+# # Single range
+# oner <- sym_over %>%
+#   filter(grepl("-", .$Years), !grepl(";", .$Years)) %>%
+#   separate(Years, into = c("begin_yr", "end_yr"), sep = "-", remove = F) 
+# # Where there's multiple ranges, pick 1st and last year
+# mr <- sym_over %>%
+#   filter(grepl(";", .$Years), grepl("-", .$Years)) %>%
+#   separate(Years, into = c("firstint", "secint"), sep = ";", remove = F) %>% 
+#   separate(firstint, into = c("begin_yr", "tmp"), sep = "-") %>% 
+#   separate(secint, into = c("tmp", "end_yr"), sep = "-") %>% 
+#   select(-tmp) 
+# # Just years separated by ; (Just Porter)
+# sr <- sym_over %>% 
+#   filter(grepl(";", .$Years), !grepl("-", .$Years)) %>%
+#   separate(Years, into = c("begin_yr", "trash", "end_yr"), sep = ";", remove = F) %>% 
+#   select(-trash)
+# # If there's only one year
+# oney <- sym_over %>%
+#   filter(!grepl(";", .$Years), !grepl("-", .$Years)) %>%
+#   mutate(begin_yr = Years,
+#          end_yr = Years)
+# # Put them back together 
+# sym_over_yrs <- sym_over %>% 
+#   # Get rid of everything with ranges, bring them back in
+#   filter(!grepl("-", .$Years), 
+#          !grepl(";", .$Years),
+#          is.na(Years)) %>% 
+#   bind_rows(., oner, mr, sr, oney) 
+# # Pick out the year version I want to keep 
+# tur_yrs <- left_join(symp, sym_over_yrs, 
+#                      by = c("Strata", "Authors", "Publication title", "Journal")
+# ) %>% 
+#   mutate(
+#     gyvr = !grepl("-", .$Year) & !is.na(Year),
+#     # gyover = !is.na(begin_yr), # first or last year of range
+#     gyover = !is.na(Years),
+#     plotyr = case_when(
+#       gyvr == T ~ Year,
+#       # gyvr == F & gyover == T ~ begin_yr 
+#       gyvr == F & gyover == T ~ end_yr 
+#       # otherwise NA
+#     )
+#   ) %>%
+#   mutate(plotyr = as.numeric(plotyr)) %>% 
+#   select(-gyvr, -gyover, -Years)
