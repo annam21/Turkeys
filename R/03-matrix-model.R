@@ -79,7 +79,7 @@ summary(r2)$r.squared
 # truncated normal (doesn't change much but ok)
 nrep <- 1000
 lambda <- rep(NA, nrep)
-NI1 <- NI2 <- NS1 <- NS2 <- C1 <- C2 <- H <- PS <- S <- R<- matrix(NA, nrow = nrep, ncol = 2)
+NI1 <- NI2 <- NS1 <- NS2 <- C1 <- C2 <- H <- PS <- S <- R <- YS <- matrix(NA, nrow = nrep, ncol = 2)
 elast <- array(NA, c(2, 2, nrep))
 for(i in 1:nrep){
   # NI1[i,] <- rnorm(2, res$BUGSoutput$median$NI[,1], res$BUGSoutput$sd$NI[,1])
@@ -108,6 +108,7 @@ for(i in 1:nrep){
                    lower = 0, upper = 1)
   S[i,] <- rtnorm(2, res$BUGSoutput$median$S, res$BUGSoutput$sd$S,
                   lower = 0, upper = 1)
+  YS[i,] <- S[i,1]^(48/52)
   
   R[i,] <- NI1[i,] * NS1[i,] * C1[i,] * 0.5 * H[i,] * PS[i,] * S[i,1]^(48/52) + 
     NI1[i,] * (1-NS1[i,]) * NI2[i,] * NS2[i,] * C2[i,] * 0.5 * H[i,] * PS[i,] *
@@ -167,6 +168,10 @@ c2 <- apply(C2, 2, function(x) lm(lambda~x))
 rr <- apply(R, 2, function(x) lm(lambda~x))
 # lapply(rr, function(x) summary(x)$r.squared)
 
+# Note YS has exactly the same r2 as subadult survival
+# ys <- apply(YS, 2, function(x) lm(lambda~x))
+# lapply(rr, function(x) summary(x)$r.squared)
+
 # Stack these
 library(dplyr)
 getr2 <- function(mod){
@@ -177,7 +182,9 @@ getr2 <- function(mod){
   cbind(tmp2, dat2)
 }
 repro <- bind_rows(getr2(ni1), getr2(ns1), getr2(c1), getr2(h), getr2(ps), 
-          getr2(ni2), getr2(ns2), getr2(c2), getr2(rr), getr2(s1)) 
+          getr2(ni2), getr2(ns2), getr2(c2), getr2(rr), getr2(s1)
+          # getr2(ys)
+          ) 
 
 # Make pretty table for MS
 repro %>% 
@@ -194,7 +201,8 @@ repro %>%
       vr == "ns2" ~ "NS2",
       vr == "c2" ~ "C2",
       vr == "rr" ~ "Reproduction",
-      vr == "s1" ~ "Annual Survival"
+      vr == "s1" ~ "Annual Survival",
+      # vr == "ys" ~ "Youth Survival"
     )
   ) %>% 
   select(vr, age1, age2) %>% 
@@ -202,7 +210,6 @@ repro %>%
          Adult = age2, 
          `Vital Rate` = vr) #%>% s
   # readr::write_csv("results/rsquared_withsyposium.csv")
-
 
 # Plot a few of them
 # ni1 <- lm(lambda ~ NI1[,1])
@@ -221,6 +228,55 @@ plot(PS[,2], lambda,
      col = scales::alpha("black", 0.2),
      xlab = "PS from adults")
 abline(ps[[2]], col = "red")
+
+# Or in ggplot, adding R2 label 
+library(ggpmisc)
+ggplot(data = data.frame(x = NI1[,2], lambda = lambda), 
+       aes(x = x, y = lambda)) +
+  geom_smooth(method = "lm", se=FALSE, color="red", formula = y~x) +
+  stat_poly_eq(formula = y ~ x, 
+               aes(label = ..rr.label..), 
+               parse = TRUE) +         
+  geom_point(alpha = 0.4) + 
+  theme_classic()
+
+# All of them together 
+resdf <- data.frame(
+  x = c(NI1[,1], NI1[,2], NI2[,1], NI2[,2],
+             NS1[,1], NS1[,2], NS2[,1], NS2[,2],
+             C1[,1], C1[,2], C2[,1], C2[,2],
+             H[,1], H[,2],
+             PS[,1], PS[,2],
+             S[,1], S[,2],
+             R[,1], R[,2]
+             ),
+  vitalrate = c(rep("NI", nrep*4), rep("NS", nrep*4), rep("C", nrep*4),
+                rep("H", nrep*2), rep("PS", nrep*2), rep("S", nrep*2), rep("R", nrep*2)),
+  nestattempt = c(rep(1, nrep*2), rep(2, nrep*2), 
+                  rep(1, nrep*2), rep(2, nrep*2),
+                  rep(1, nrep*2), rep(2, nrep*2),
+                  rep(NA, nrep*8)),
+  age = c(rep("subadult", nrep), rep("adult", nrep), rep("subadult", nrep), rep("adult", nrep), 
+          rep("subadult", nrep), rep("adult", nrep), rep("subadult", nrep), rep("adult", nrep), 
+          rep("subadult", nrep), rep("adult", nrep), rep("subadult", nrep), rep("adult", nrep), 
+          rep("subadult", nrep), rep("adult", nrep), 
+          rep("subadult", nrep), rep("adult", nrep), 
+          rep("subadult", nrep), rep("adult", nrep), 
+          rep("subadult", nrep), rep("adult", nrep)),
+  lambda = rep(lambda, 20)
+)
+
+# Or in ggplot, adding R2 label 
+ggplot(data = resdf, 
+       aes(x = x, y = lambda, color = age)) +
+  geom_smooth(method = "lm", se=FALSE, formula = y~x) +
+  # stat_poly_eq(formula = y ~ x, 
+  #              aes(label = ..rr.label..), 
+  #              parse = TRUE) +         
+  geom_point(alpha = 0.4) + 
+  theme_classic() + 
+  facet_wrap(vars(vitalrate, nestattempt), scales = "free")
+
 
 ###########################################
 # Beta distribution instead of normal 
