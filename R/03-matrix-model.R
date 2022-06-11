@@ -22,6 +22,7 @@ lambda <- rep(NA, nrep)
 S <- matrix(NA, nrow = nrep, ncol = 2)
 R <- matrix(NA, nrow = nrep, ncol = 2)
 elast <- array(NA, c(2,2,nrep))
+set.seed(1245)
 for(i in 1:nrep){
   # S[i,] <- rnorm(2, Smu, Ssd) # fine but I only use adult survival
   S[i,] <- rtnorm(2, Smu, Ssd, lower = 0, upper = 1)
@@ -81,6 +82,7 @@ nrep <- 1000
 lambda <- rep(NA, nrep)
 NI1 <- NI2 <- NS1 <- NS2 <- C1 <- C2 <- H <- PS <- S <- R <- YS <- matrix(NA, nrow = nrep, ncol = 2)
 elast <- array(NA, c(2, 2, nrep))
+set.seed(1245)
 for(i in 1:nrep){
   # NI1[i,] <- rnorm(2, res$BUGSoutput$median$NI[,1], res$BUGSoutput$sd$NI[,1])
   # NI2[i,] <- rnorm(2, res$BUGSoutput$median$NI[,2], res$BUGSoutput$sd$NI[,2])
@@ -208,7 +210,7 @@ repro %>%
   select(vr, age1, age2) %>% 
   rename(Subadult = age1, 
          Adult = age2, 
-         `Vital Rate` = vr) #%>% s
+         `Vital Rate` = vr) #%>% 
   # readr::write_csv("results/rsquared_withsyposium.csv")
 
 # Plot a few of them
@@ -217,28 +219,43 @@ repro %>%
 # abline(ni1)
 # summary(ni1)$r.squared
 
-plot(NI1[,2], lambda, 
-     pch = 16, 
-     col = scales::alpha("black", 0.2),
-     xlab = "NI1 adults")
-abline(ni1[[2]], col = "red")
-
-plot(PS[,2], lambda, 
-     pch = 16, 
-     col = scales::alpha("black", 0.2),
-     xlab = "PS from adults")
-abline(ps[[2]], col = "red")
+# plot(S[,2], lambda, 
+#      pch = 16, 
+#      col = scales::alpha("black", 0.2),
+#      xlab = "S")
+# abline(s1[[2]], col = "red")
+# 
+# plot(PS[,2], lambda, 
+#      pch = 16, 
+#      col = scales::alpha("black", 0.2),
+#      xlab = "PS from adults")
+# abline(ps[[2]], col = "red")
 
 # Or in ggplot, adding R2 label 
+library(tidyverse)
 library(ggpmisc)
-ggplot(data = data.frame(x = NI1[,2], lambda = lambda), 
-       aes(x = x, y = lambda)) +
-  geom_smooth(method = "lm", se=FALSE, color="red", formula = y~x) +
+myvr <- tibble(
+  `S[SY]` = S[,1],
+  `S[ASY]` = S[,2],
+  `R[SY]` = R[,1],
+  `R[ASY]` = R[,2],
+  lambda = lambda
+) %>% 
+  pivot_longer(1:4, names_to = "vitalrate", values_to = "val") %>% 
+  mutate(vitalrate = factor(vitalrate, levels = c("R[SY]", "R[ASY]", "S[SY]", "S[ASY]")))
+ggplot(myvr, 
+       aes(x = val, y = lambda)) +
   stat_poly_eq(formula = y ~ x, 
                aes(label = ..rr.label..), 
                parse = TRUE) +         
-  geom_point(alpha = 0.4) + 
-  theme_classic()
+  geom_point(alpha = 0.1, color = "navyblue") + 
+  geom_smooth(method = "lm", se=FALSE, color="navyblue", formula = y~x) +
+  theme_classic() + 
+  xlab(NULL) +
+  theme(strip.text.x = element_text(size = 14)) +
+  facet_wrap(~vitalrate, scales = "free", 
+             labeller = label_parsed) # For subscript 
+ggsave("results/vitalrate_regression.jpg", width = 7)
 
 # All of them together 
 resdf <- data.frame(
