@@ -78,7 +78,7 @@ summary(r2)$r.squared
 # All have 2 columns - age 1 and age 2
 
 # truncated normal (doesn't change much but ok)
-nrep <- 1000
+nrep <- 10000
 lambda <- rep(NA, nrep)
 NI1 <- NI2 <- NS1 <- NS2 <- C1 <- C2 <- H <- PS <- S <- R <- YS <- matrix(NA, nrow = nrep, ncol = 2)
 elast <- array(NA, c(2, 2, nrep))
@@ -130,11 +130,38 @@ for(i in 1:nrep){
   elast[, , i] <- popbio::elasticity(mat)
 }
 
-# Visualize 
+# Summaries
 mnl <- mean(lambda)
-hist(lambda)
-abline(v = mnl, col = "red", lty = "dashed", lwd = 2)
+quantile(lambda, c(0.025, 0.5, 0.975))
+sum(lambda < 1)/length(lambda) # how much below 1?
+
+# Visualize 
+hist(lambda, freq = F, col = NULL)
 text(x = mnl+0.2, y = 150, labels = paste0("lambda ", round(mnl, 2)), col = "red")
+lines(density(lambda))
+plot(density(lambda))
+
+# Pretty plot with nice even normal distribution 
+xs <- seq(min(lambda), max(lambda), by = 0.01)
+plot(xs, dnorm(xs, mean = mean(lambda), sd = sd(lambda)),
+     type = "l", 
+     ylab = "Probability density", 
+     xlab = "Asymptotic growth rate")
+colorArea <- function(from, to, density, ..., col="blue", dens=NULL){
+  y_seq <- seq(from, to, length.out=500)
+  d <- c(0, density(y_seq, ...), 0)
+  polygon(c(from, y_seq, to), d, col=col, density=dens, border = "gray")
+}
+colorArea(from=min(lambda), 
+          to=1, 
+          dnorm,
+          mean=mean(lambda), 
+          sd=sd(lambda), 
+          col="gray")
+lines(xs, dnorm(xs, mean = mean(lambda), sd = sd(lambda))) # plot again to put it on top
+abline(v = mnl, lty = "dashed")
+abline(v = quantile(lambda, 0.025), lty = "dotted")
+abline(v = quantile(lambda, 0.975), lty = "dotted")
 
 # Elasticity 
 apply(elast, c(1,2), mean)
